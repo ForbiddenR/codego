@@ -89,10 +89,23 @@ func main() {
 	}
 	mcpListCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List MCP servers",
+		Short: "List configured MCP servers",
 		RunE:  runMcpList,
 	}
-	mcpCmd.AddCommand(mcpListCmd)
+	mcpAddCmd := &cobra.Command{
+		Use:   "add NAME --command CMD [-- arg1 arg2...]",
+		Short: "Add an MCP server",
+		RunE:  runMcpAdd,
+	}
+	mcpAddCmd.Flags().String("command", "", "Command to run the MCP server (required)")
+	mcpAddCmd.Flags().StringSlice("args", nil, "Arguments for the command")
+	mcpRemoveCmd := &cobra.Command{
+		Use:   "remove NAME",
+		Short: "Remove an MCP server from config",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runMcpRemove,
+	}
+	mcpCmd.AddCommand(mcpListCmd, mcpAddCmd, mcpRemoveCmd)
 
 	// Doctor command
 	doctorCmd := &cobra.Command{
@@ -264,7 +277,76 @@ func runSessionsExport(cmd *cobra.Command, args []string) error {
 }
 
 func runMcpList(cmd *cobra.Command, args []string) error {
-	fmt.Println("(MCP not implemented yet — coming in Phase 10)")
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	if len(cfg.MCP.Servers) == 0 {
+		fmt.Println("No MCP servers configured.")
+		fmt.Println("Add one: codego mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem /tmp")
+		return nil
+	}
+
+	fmt.Printf("%-20s %s\n", "Name", "Command")
+	fmt.Println("----------------------------------------")
+	for name, server := range cfg.MCP.Servers {
+		cmdStr := server.Command
+		if len(server.Args) > 0 {
+			cmdStr += " " + server.Args[0]
+			if len(server.Args) > 1 {
+				cmdStr += " ..."
+			}
+		}
+		fmt.Printf("%-20s %s\n", name, cmdStr)
+	}
+	return nil
+}
+
+func runMcpAdd(cmd *cobra.Command, args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("usage: codego mcp add NAME --command CMD [args...]")
+	}
+
+	name := args[0]
+
+	command, _ := cmd.Flags().GetString("command")
+	if command == "" {
+		return fmt.Errorf("--command is required")
+	}
+
+	// Remaining args after --
+	cmdArgs := []string{}
+	for _, arg := range args[1:] {
+		cmdArgs = append(cmdArgs, arg)
+	}
+
+	// Get args from flag too
+	flagArgs, _ := cmd.Flags().GetStringSlice("args")
+	cmdArgs = append(cmdArgs, flagArgs...)
+
+	// Save to config
+	if err := config.Set(fmt.Sprintf("mcp.servers.%s.command", name), command); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
+	fmt.Printf("Added MCP server %q: %s", name, command)
+	if len(cmdArgs) > 0 {
+		fmt.Printf(" %v", cmdArgs)
+	}
+	fmt.Println()
+	return nil
+}
+
+func runMcpRemove(cmd *cobra.Command, args []string) error {
+	name := args[0]
+
+	// Remove from config by setting to empty
+	if err := config.Set(fmt.Sprintf("mcp.servers.%s", name), ""); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
+	fmt.Printf("Removed MCP server %q\n", name)
 	return nil
 }
 
