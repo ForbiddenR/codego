@@ -185,8 +185,8 @@ func TestMessageView_Render_ToolCall_LongOutput(t *testing.T) {
 	}
 }
 
-func TestAppModel_NewAppModel(t *testing.T) {
-	m := NewAppModel(nil)
+func TestNewAppModel(t *testing.T) {
+	m := NewAppModel(nil, "0.1.0")
 
 	if m.state != StateInput {
 		t.Errorf("state = %d, want StateInput", m.state)
@@ -194,12 +194,27 @@ func TestAppModel_NewAppModel(t *testing.T) {
 	if len(m.messages) != 0 {
 		t.Errorf("messages = %d, want 0", len(m.messages))
 	}
+	if m.version != "0.1.0" {
+		t.Errorf("version = %q", m.version)
+	}
+}
+
+func TestAppModel_View_Welcome(t *testing.T) {
+	m := NewAppModel(nil, "0.1.0")
+	m.width = 80
+	m.height = 24
+
+	view := m.View()
+	if !strings.Contains(view, "CodeGo") {
+		t.Errorf("should show welcome banner: %s", view[:200])
+	}
 }
 
 func TestAppModel_View_Initialized(t *testing.T) {
-	m := NewAppModel(nil)
+	m := NewAppModel(nil, "0.1.0")
 	m.width = 80
 	m.height = 24
+	m.messages = []MessageView{NewUserMessageView("hi")}
 
 	view := m.View()
 	if !strings.Contains(view, "CodeGo") {
@@ -208,7 +223,7 @@ func TestAppModel_View_Initialized(t *testing.T) {
 }
 
 func TestAppModel_View_NotInitialized(t *testing.T) {
-	m := NewAppModel(nil)
+	m := NewAppModel(nil, "0.1.0")
 	// width is 0
 	view := m.View()
 	if view != "Initializing..." {
@@ -217,7 +232,7 @@ func TestAppModel_View_NotInitialized(t *testing.T) {
 }
 
 func TestAppModel_renderStatusBar(t *testing.T) {
-	m := NewAppModel(nil)
+	m := NewAppModel(nil, "0.1.0")
 	m.width = 80
 	m.messages = []MessageView{NewUserMessageView("hi"), NewAssistantMessageView()}
 
@@ -231,7 +246,7 @@ func TestAppModel_renderStatusBar(t *testing.T) {
 }
 
 func TestAppModel_renderSpinner_Thinking(t *testing.T) {
-	m := NewAppModel(nil)
+	m := NewAppModel(nil, "0.1.0")
 	m.state = StateThinking
 
 	spinner := m.renderSpinner()
@@ -241,12 +256,67 @@ func TestAppModel_renderSpinner_Thinking(t *testing.T) {
 }
 
 func TestAppModel_renderSpinner_ToolRunning(t *testing.T) {
-	m := NewAppModel(nil)
+	m := NewAppModel(nil, "0.1.0")
 	m.state = StateToolRunning
 	m.activeTool = "bash"
 
 	spinner := m.renderSpinner()
 	if !strings.Contains(spinner, "bash") {
 		t.Errorf("should show tool name: %s", spinner)
+	}
+}
+
+// ─── Theme Tests ───
+
+func TestDefaultTheme(t *testing.T) {
+	t2 := DefaultTheme
+	_ = t2 // verify it compiles and doesn't panic
+}
+
+func TestLightTheme(t *testing.T) {
+	t2 := LightTheme
+	_ = t2
+}
+
+// ─── Approval Dialog Tests ───
+
+func TestApprovalDialog_Render(t *testing.T) {
+	d := NewApprovalDialog("bash", map[string]interface{}{"command": "ls"})
+	rendered := d.Render(80)
+
+	if !strings.Contains(rendered, "bash") {
+		t.Errorf("should contain tool name: %s", rendered)
+	}
+	if !strings.Contains(rendered, "Allow tool") {
+		t.Errorf("should contain prompt: %s", rendered)
+	}
+	if !strings.Contains(rendered, "[y]") {
+		t.Errorf("should contain options: %s", rendered)
+	}
+}
+
+func TestApprovalDialog_Hidden(t *testing.T) {
+	d := ApprovalDialog{Visible: false}
+	rendered := d.Render(80)
+	if rendered != "" {
+		t.Errorf("hidden dialog should be empty: %s", rendered)
+	}
+}
+
+// ─── Welcome Screen Tests ───
+
+func TestWelcomeScreen(t *testing.T) {
+	s := WelcomeScreen("claude-sonnet", "0.1.0", 80)
+	if !strings.Contains(s, "CodeGo") {
+		t.Errorf("should contain CodeGo: %s", s[:200])
+	}
+	if !strings.Contains(s, "claude-sonnet") {
+		t.Errorf("should contain model: %s", s)
+	}
+	if !strings.Contains(s, "0.1.0") {
+		t.Errorf("should contain version: %s", s)
+	}
+	if !strings.Contains(s, "/help") {
+		t.Errorf("should contain tips: %s", s)
 	}
 }

@@ -71,11 +71,12 @@ type AppModel struct {
 	height      int
 	err         error
 	activeTool  string
-	initialized bool
+	theme       Theme
+	version     string
 }
 
 // NewAppModel creates a new TUI app model.
-func NewAppModel(a *agent.Agent) AppModel {
+func NewAppModel(a *agent.Agent, version string) AppModel {
 	in := textarea.New()
 	in.Placeholder = "Send a message..."
 	in.Focus()
@@ -86,10 +87,12 @@ func NewAppModel(a *agent.Agent) AppModel {
 	vp := viewport.New(80, 20)
 
 	return AppModel{
-		state:    StateInput,
-		agent:    a,
-		input:    in,
+		state:   StateInput,
+		agent:   a,
+		input:   in,
 		viewport: vp,
+		theme:   DefaultTheme,
+		version: version,
 	}
 }
 
@@ -176,6 +179,15 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m AppModel) View() string {
 	if m.width == 0 {
 		return "Initializing..."
+	}
+
+	// Show welcome when no messages
+	if len(m.messages) == 0 {
+		modelName := "unknown"
+		if m.agent != nil {
+			modelName = m.agent.Model()
+		}
+		return WelcomeScreen(modelName, m.version, m.width)
 	}
 
 	var sections []string
