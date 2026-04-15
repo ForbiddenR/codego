@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/nice-code/codego/internal/config"
+	"github.com/nice-code/codego/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -57,10 +59,28 @@ func main() {
 	}
 	sessionsListCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List sessions",
+		Short: "List recent sessions",
 		RunE:  runSessionsList,
 	}
-	sessionsCmd.AddCommand(sessionsListCmd)
+	sessionsResumeCmd := &cobra.Command{
+		Use:   "resume ID",
+		Short: "Resume a session by ID",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runSessionsResume,
+	}
+	sessionsDeleteCmd := &cobra.Command{
+		Use:   "delete ID",
+		Short: "Delete a session",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runSessionsDelete,
+	}
+	sessionsExportCmd := &cobra.Command{
+		Use:   "export ID",
+		Short: "Export a session as JSONL",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runSessionsExport,
+	}
+	sessionsCmd.AddCommand(sessionsListCmd, sessionsResumeCmd, sessionsDeleteCmd, sessionsExportCmd)
 
 	// MCP commands
 	mcpCmd := &cobra.Command{
@@ -155,7 +175,91 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 }
 
 func runSessionsList(cmd *cobra.Command, args []string) error {
-	fmt.Println("(Session storage not implemented yet — coming in Phase 6)")
+	store, err := session.OpenDefault()
+	if err != nil {
+		return fmt.Errorf("open session store: %w", err)
+	}
+	defer store.Close()
+
+	sessions, err := store.ListSessions(20)
+	if err != nil {
+		return err
+	}
+
+	if len(sessions) == 0 {
+		fmt.Println("No sessions yet.")
+		return nil
+	}
+
+	fmt.Printf("%-20s %-8s %-20s %s\n", "ID", "Messages", "Updated", "Title")
+	fmt.Println(strings.Repeat("-", 70))
+	for _, s := range sessions {
+		title := s.Title
+		if title == "" {
+			title = "(untitled)"
+		}
+		if len(title) > 30 {
+			title = title[:27] + "..."
+		}
+		fmt.Printf("%-20s %-8d %-20s %s\n", s.ID[:min(20, len(s.ID))], s.MsgCount, s.UpdatedAt.Format("2006-01-02 15:04"), title)
+	}
+	return nil
+}
+
+func runSessionsResume(cmd *cobra.Command, args []string) error {
+	store, err := session.OpenDefault()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	id := args[0]
+	info, err := store.GetSession(id)
+	if err != nil {
+		return err
+	}
+
+	msgs, err := store.GetMessages(id)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Session: %s (%d messages)\n", info.Title, len(msgs))
+	fmt.Printf("Resuming not yet implemented (Phase 9 — Interactive REPL)\n")
+	fmt.Printf("Messages will be loaded from: %s\n", id)
+	return nil
+}
+
+func runSessionsDelete(cmd *cobra.Command, args []string) error {
+	store, err := session.OpenDefault()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	id := args[0]
+	if err := store.DeleteSession(id); err != nil {
+		return err
+	}
+
+	fmt.Printf("Deleted session %s\n", id)
+	return nil
+}
+
+func runSessionsExport(cmd *cobra.Command, args []string) error {
+	store, err := session.OpenDefault()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+
+	id := args[0]
+	jsonl, err := store.ExportJSONL(id)
+	if err != nil {
+		return err
+	}
+
+	fmt.Print(jsonl)
 	return nil
 }
 
