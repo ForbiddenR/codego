@@ -37,12 +37,18 @@ func main() {
 		Short: "Show current config",
 		RunE:  runConfigShow,
 	}
+	configSetCmd := &cobra.Command{
+		Use:   "set KEY VALUE",
+		Short: "Set a config value (e.g. codego config set model.default claude-sonnet-4-20250514)",
+		Args:  cobra.ExactArgs(2),
+		RunE:  runConfigSet,
+	}
 	configPathCmd := &cobra.Command{
 		Use:   "path",
 		Short: "Show config file path",
 		RunE:  runConfigPath,
 	}
-	configCmd.AddCommand(configShowCmd, configPathCmd)
+	configCmd.AddCommand(configShowCmd, configSetCmd, configPathCmd)
 
 	// Sessions commands
 	sessionsCmd := &cobra.Command{
@@ -131,9 +137,20 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 }
 
 func runConfigPath(cmd *cobra.Command, args []string) error {
-	home, _ := os.UserHomeDir()
-	fmt.Printf("Config: %s/.codego/config.yaml\n", home)
-	fmt.Printf("Env:    %s/.codego/.env\n", home)
+	fmt.Printf("Config: %s\n", config.Path())
+	fmt.Printf("Env:    %s\n", config.EnvPath())
+	return nil
+}
+
+func runConfigSet(cmd *cobra.Command, args []string) error {
+	key := args[0]
+	value := args[1]
+
+	if err := config.Set(key, value); err != nil {
+		return fmt.Errorf("failed to set config: %w", err)
+	}
+
+	fmt.Printf("Set %s = %s\n", key, value)
 	return nil
 }
 

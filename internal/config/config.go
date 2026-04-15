@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/joho/godotenv"
@@ -108,4 +110,67 @@ func Load() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// Set writes a single key-value pair to the config file.
+// Creates the config file if it doesn't exist.
+func Set(key, value string) error {
+	configDir := Dir()
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
+	}
+
+	viper.SetConfigFile(Path())
+	_ = viper.ReadInConfig() // ignore if missing
+
+	// Auto-detect type
+	typed := parseValue(value)
+	viper.Set(key, typed)
+
+	return viper.WriteConfig()
+}
+
+// SetAll writes multiple key-value pairs at once.
+func SetAll(pairs map[string]string) error {
+	configDir := Dir()
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
+	}
+
+	viper.SetConfigFile(Path())
+	_ = viper.ReadInConfig()
+
+	for key, value := range pairs {
+		viper.Set(key, parseValue(value))
+	}
+
+	return viper.WriteConfig()
+}
+
+// Get returns the current value for a config key.
+func Get(key string) interface{} {
+	return viper.Get(key)
+}
+
+// GetAll returns all config values.
+func GetAll() map[string]interface{} {
+	return viper.AllSettings()
+}
+
+// parseValue attempts to parse a string value into its proper type.
+func parseValue(value string) interface{} {
+	// Bool
+	if b, err := strconv.ParseBool(value); err == nil {
+		return b
+	}
+	// Int
+	if i, err := strconv.Atoi(value); err == nil {
+		return i
+	}
+	// Float
+	if f, err := strconv.ParseFloat(value, 64); err == nil {
+		return f
+	}
+	// String
+	return value
 }
