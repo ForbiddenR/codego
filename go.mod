@@ -3,6 +3,7 @@ module github.com/nice-code/codego
 go 1.26.2
 
 require (
+	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
